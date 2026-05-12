@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from .database import Base, engine
+from fastapi.middleware.cors import CORSMiddleware
 import app.models # triggers all model imports
 
 from app.routers import (
@@ -8,6 +9,17 @@ from app.routers import (
 )
 
 app = FastAPI(title="Vehicle System", version="1.0.0")
+
+# CORS = Cross-Origin Resource Sharing
+# Browsers block requests between different ports/domains by default
+# This tells FastAPI to allow requests from our React dev server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # React dev server port
+    allow_credentials=True,
+    allow_methods=["*"],   # allow GET, POST, PUT, DELETE etc
+    allow_headers=["*"],   # allow all headers
+)
 
 # Create all tables on startup if they don't exist
 Base.metadata.create_all(bind=engine)
