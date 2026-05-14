@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.vehicle import Vehicle
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse
+from app.services.auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/vehicles", tags=["Vehicles"])
 
@@ -21,7 +22,7 @@ def get_vehicle(code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return vehicle
 
-@router.post("/", response_model=VehicleResponse, status_code=201)
+@router.post("/", response_model=VehicleResponse, status_code=201,dependencies=[Depends(require_admin)])
 def create_vehicle(data: VehicleCreate, db: Session = Depends(get_db)):
     existing = db.query(Vehicle).filter(Vehicle.code == data.code).first()
     if existing:
@@ -32,7 +33,7 @@ def create_vehicle(data: VehicleCreate, db: Session = Depends(get_db)):
     db.refresh(vehicle)
     return vehicle
 
-@router.put("/{code}", response_model=VehicleResponse)
+@router.put("/{code}", response_model=VehicleResponse, dependencies=[Depends(require_admin)])
 def update_vehicle(code: str, data: VehicleUpdate, db: Session = Depends(get_db)):
     vehicle = db.query(Vehicle).filter(Vehicle.code == code).first()
     if not vehicle:
@@ -43,7 +44,7 @@ def update_vehicle(code: str, data: VehicleUpdate, db: Session = Depends(get_db)
     db.refresh(vehicle)
     return vehicle
 
-@router.delete("/{code}", status_code=204)
+@router.delete("/{code}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_vehicle(code: str, db: Session = Depends(get_db)):
     vehicle = db.query(Vehicle).filter(Vehicle.code == code).first()
     if not vehicle:

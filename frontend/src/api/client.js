@@ -1,19 +1,27 @@
 import axios from 'axios'
 
 const client = axios.create({
-  baseURL: 'http://localhost:8080',  // all requests go to our FastAPI server
+  baseURL: 'http://localhost:8080',
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
 client.interceptors.response.use(
-  response => response,  // if success, just return the response
+  response => response,
   error => {
-    // error.response.data.detail is how FastAPI sends error messages
     const message = error.response?.data?.detail || 'Something went wrong'
     console.error('API Error:', message)
-    return Promise.reject(error)  // still pass the error along to the caller
+
+    // If token expired or invalid → force logout
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      delete client.defaults.headers.common['Authorization']
+      // Redirect to login — works even outside React components
+      window.location.href = '/login'
+    }
+
+    return Promise.reject(error)
   }
 )
 

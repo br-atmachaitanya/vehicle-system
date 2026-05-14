@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -18,7 +19,7 @@ def get_credit_account(code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Credit account not found")
     return ca
 
-@router.post("/", response_model=CreditAccountResponse, status_code=201)
+@router.post("/", response_model=CreditAccountResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_credit_account(data: CreditAccountCreate, db: Session = Depends(get_db)):
     existing = db.query(CreditAccount).filter(CreditAccount.code == data.code).first()
     if existing:
@@ -29,7 +30,7 @@ def create_credit_account(data: CreditAccountCreate, db: Session = Depends(get_d
     db.refresh(ca)
     return ca
 
-@router.put("/{code}", response_model=CreditAccountResponse)
+@router.put("/{code}", response_model=CreditAccountResponse, dependencies=[Depends(require_admin)])
 def update_credit_account(code: str, data: CreditAccountUpdate, db: Session = Depends(get_db)):
     ca = db.query(CreditAccount).filter(CreditAccount.code == code).first()
     if not ca:
@@ -40,7 +41,7 @@ def update_credit_account(code: str, data: CreditAccountUpdate, db: Session = De
     db.refresh(ca)
     return ca
 
-@router.delete("/{code}", status_code=204)
+@router.delete("/{code}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_credit_account(code: str, db: Session = Depends(get_db)):
     ca = db.query(CreditAccount).filter(CreditAccount.code == code).first()
     if not ca:

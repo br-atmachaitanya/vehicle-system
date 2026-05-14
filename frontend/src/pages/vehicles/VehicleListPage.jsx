@@ -1,3 +1,4 @@
+import { useAuth } from '../../context/AuthContext'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'  // for programmatic navigation
 import { vehicleApi } from '../../api'
@@ -6,6 +7,7 @@ import Alert from '../../components/ui/Alert'
 
 export default function VehicleListPage() {
   const [vehicles, setVehicles] = useState([])   // list of vehicles from API
+  const { user } = useAuth()   // get current user
   const [loading, setLoading]   = useState(true) // true while fetching
   const [alert, setAlert]       = useState(null)
 
@@ -127,20 +129,26 @@ export default function VehicleListPage() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => navigate(`/vehicles/${vehicle.code}/edit`)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={() => handleDelete(vehicle.code, vehicle.description)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
+                      {/* Only show edit/delete to admins */}
+                      {user?.is_admin ? (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            onClick={() => navigate(`/vehicles/${vehicle.code}/edit`)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => handleDelete(vehicle.code, vehicle.description)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      ) : (
+                        // Operators see a view-only indicator
+                        <span className="text-xs text-gray-400">View only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

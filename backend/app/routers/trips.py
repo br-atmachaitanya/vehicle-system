@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -6,6 +7,7 @@ from app.database import get_db
 from app.models.trip import Trip
 from app.schemas.trip import TripCreate, TripUpdate, TripResponse
 from app.services.charge import calculate_trip_charge
+
 
 router = APIRouter(prefix="/api/trips", tags=["Trips"])
 
@@ -41,7 +43,7 @@ def get_trip(trip_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Trip not found")
     return trip
 
-@router.post("/", response_model=TripResponse, status_code=201)
+@router.post("/", response_model=TripResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_trip(data: TripCreate, db: Session = Depends(get_db)):
     trip = Trip(**data.model_dump())
     db.add(trip)
@@ -49,7 +51,7 @@ def create_trip(data: TripCreate, db: Session = Depends(get_db)):
     db.refresh(trip)
     return trip
 
-@router.put("/{trip_id}", response_model=TripResponse)
+@router.put("/{trip_id}", response_model=TripResponse, dependencies=[Depends(require_admin)])
 def update_trip(trip_id: int, data: TripUpdate, db: Session = Depends(get_db)):
     trip = db.query(Trip).filter(Trip.id == trip_id).first()
     if not trip:
@@ -60,7 +62,7 @@ def update_trip(trip_id: int, data: TripUpdate, db: Session = Depends(get_db)):
     db.refresh(trip)
     return trip
 
-@router.delete("/{trip_id}", status_code=204)
+@router.delete("/{trip_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_trip(trip_id: int, db: Session = Depends(get_db)):
     trip = db.query(Trip).filter(Trip.id == trip_id).first()
     if not trip:

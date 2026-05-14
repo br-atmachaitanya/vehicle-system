@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -20,7 +21,7 @@ def get_driver(code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Driver not found")
     return driver
 
-@router.post("/", response_model=DriverResponse, status_code=201)
+@router.post("/", response_model=DriverResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_driver(data: DriverCreate, db: Session = Depends(get_db)):
     existing = db.query(Driver).filter(Driver.code == data.code).first()
     if existing:
@@ -31,7 +32,7 @@ def create_driver(data: DriverCreate, db: Session = Depends(get_db)):
     db.refresh(driver)
     return driver
 
-@router.put("/{code}", response_model=DriverResponse)
+@router.put("/{code}", response_model=DriverResponse, dependencies=[Depends(require_admin)])
 def update_driver(code: str, data: DriverUpdate, db: Session = Depends(get_db)):
     driver = db.query(Driver).filter(Driver.code == code).first()
     if not driver:
@@ -42,7 +43,7 @@ def update_driver(code: str, data: DriverUpdate, db: Session = Depends(get_db)):
     db.refresh(driver)
     return driver
 
-@router.delete("/{code}", status_code=204)
+@router.delete("/{code}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_driver(code: str, db: Session = Depends(get_db)):
     driver = db.query(Driver).filter(Driver.code == code).first()
     if not driver:

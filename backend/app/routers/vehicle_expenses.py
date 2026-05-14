@@ -5,6 +5,7 @@ from datetime import date
 from app.database import get_db
 from app.models.vehicle_expense import VehicleExpense
 from app.schemas.vehicle_expense import VehicleExpenseCreate, VehicleExpenseUpdate, VehicleExpenseResponse
+from app.services.auth import require_admin
 
 router = APIRouter(prefix="/api/expenses", tags=["Vehicle Expenses"])
 
@@ -27,7 +28,7 @@ def list_expenses(
         query = query.filter(VehicleExpense.date <= date_to)
     return query.order_by(VehicleExpense.date).all()
 
-@router.post("/", response_model=VehicleExpenseResponse, status_code=201)
+@router.post("/", response_model=VehicleExpenseResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_expense(data: VehicleExpenseCreate, db: Session = Depends(get_db)):
     expense = VehicleExpense(**data.model_dump())
     db.add(expense)
@@ -35,7 +36,7 @@ def create_expense(data: VehicleExpenseCreate, db: Session = Depends(get_db)):
     db.refresh(expense)
     return expense
 
-@router.put("/{expense_id}", response_model=VehicleExpenseResponse)
+@router.put("/{expense_id}", response_model=VehicleExpenseResponse, dependencies=[Depends(require_admin)])
 def update_expense(expense_id: int, data: VehicleExpenseUpdate, db: Session = Depends(get_db)):
     expense = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
     if not expense:
@@ -46,7 +47,7 @@ def update_expense(expense_id: int, data: VehicleExpenseUpdate, db: Session = De
     db.refresh(expense)
     return expense
 
-@router.delete("/{expense_id}", status_code=204)
+@router.delete("/{expense_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     expense = db.query(VehicleExpense).filter(VehicleExpense.id == expense_id).first()
     if not expense:

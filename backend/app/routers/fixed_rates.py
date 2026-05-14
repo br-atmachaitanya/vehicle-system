@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -18,7 +19,7 @@ def get_fixed_rate(code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Fixed rate not found")
     return rate
 
-@router.post("/", response_model=FixedRateResponse, status_code=201)
+@router.post("/", response_model=FixedRateResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_fixed_rate(data: FixedRateCreate, db: Session = Depends(get_db)):
     existing = db.query(FixedRate).filter(FixedRate.code == data.code).first()
     if existing:
@@ -29,7 +30,7 @@ def create_fixed_rate(data: FixedRateCreate, db: Session = Depends(get_db)):
     db.refresh(rate)
     return rate
 
-@router.put("/{code}", response_model=FixedRateResponse)
+@router.put("/{code}", response_model=FixedRateResponse, dependencies=[Depends(require_admin)])
 def update_fixed_rate(code: str, data: FixedRateUpdate, db: Session = Depends(get_db)):
     rate = db.query(FixedRate).filter(FixedRate.code == code).first()
     if not rate:
@@ -40,7 +41,7 @@ def update_fixed_rate(code: str, data: FixedRateUpdate, db: Session = Depends(ge
     db.refresh(rate)
     return rate
 
-@router.delete("/{code}", status_code=204)
+@router.delete("/{code}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_fixed_rate(code: str, db: Session = Depends(get_db)):
     rate = db.query(FixedRate).filter(FixedRate.code == code).first()
     if not rate:

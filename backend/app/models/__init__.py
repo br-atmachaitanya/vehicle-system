@@ -9,3 +9,4 @@ from .fixed_rate import FixedRate
 from .purpose import Purpose
 from .trip import Trip
 from .vehicle_expense import VehicleExpense
+from .system_user import SystemUser   # new

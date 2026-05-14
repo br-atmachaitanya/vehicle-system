@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -13,7 +14,7 @@ def get_institution(db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Institution not configured")
     return inst
 
-@router.post("/", response_model=InstitutionResponse)
+@router.post("/", response_model=InstitutionResponse, dependencies=[Depends(require_admin)])
 def create_institution(data: InstitutionUpdate, db: Session = Depends(get_db)):
     existing = db.query(Institution).first()
     if existing:
@@ -24,7 +25,7 @@ def create_institution(data: InstitutionUpdate, db: Session = Depends(get_db)):
     db.refresh(inst)
     return inst
 
-@router.put("/", response_model=InstitutionResponse)
+@router.put("/", response_model=InstitutionResponse, dependencies=[Depends(require_admin)])
 def update_institution(data: InstitutionUpdate, db: Session = Depends(get_db)):
     inst = db.query(Institution).first()
     if not inst:

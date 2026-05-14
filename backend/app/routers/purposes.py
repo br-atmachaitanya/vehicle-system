@@ -1,3 +1,4 @@
+from app.services.auth import get_current_user, require_admin
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -14,7 +15,7 @@ def list_purposes(search: Optional[str] = None, db: Session = Depends(get_db)):
         query = query.filter(Purpose.text.ilike(f"%{search}%"))
     return query.order_by(Purpose.text).all()
 
-@router.post("/", response_model=PurposeResponse, status_code=201)
+@router.post("/", response_model=PurposeResponse, status_code=201, dependencies=[Depends(require_admin)])
 def create_purpose(data: PurposeCreate, db: Session = Depends(get_db)):
     existing = db.query(Purpose).filter(Purpose.text == data.text).first()
     if existing:
@@ -25,7 +26,7 @@ def create_purpose(data: PurposeCreate, db: Session = Depends(get_db)):
     db.refresh(purpose)
     return purpose
 
-@router.delete("/{purpose_id}", status_code=204)
+@router.delete("/{purpose_id}", status_code=204, dependencies=[Depends(require_admin)])
 def delete_purpose(purpose_id: int, db: Session = Depends(get_db)):
     purpose = db.query(Purpose).filter(Purpose.id == purpose_id).first()
     if not purpose:
