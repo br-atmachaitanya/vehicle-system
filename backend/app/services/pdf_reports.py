@@ -140,7 +140,7 @@ def text(content, style_name='normal', styles=None):
 def pdf_account_bill(data: dict) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
+        buffer, pagesize=landscape(A4),
         leftMargin=12*mm, rightMargin=12*mm,
         topMargin=12*mm, bottomMargin=12*mm
     )
@@ -176,7 +176,9 @@ def pdf_account_bill(data: dict) -> bytes:
 
         # Column widths — must add up to page width minus margins
         # A4 portrait usable width = 210 - 24 = 186mm
-        col_widths = [18*mm, 38*mm, 36*mm, 58*mm, 13*mm, 23*mm]
+        # col_widths = [18*mm, 38*mm, 36*mm, 58*mm, 13*mm, 23*mm]
+        # Landscape = 273mm usable, so we can give more space to text columns
+        col_widths = [26*mm, 56*mm, 53*mm, 85*mm, 19*mm, 34*mm]
         table = Table(table_data, colWidths=col_widths,
                       repeatRows=1)  # repeat header on each page
 
@@ -203,7 +205,7 @@ def pdf_account_bill(data: dict) -> bytes:
 def pdf_credit_bill(data: dict) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
+        buffer, pagesize=landscape(A4),
         leftMargin=12*mm, rightMargin=12*mm,
         topMargin=12*mm, bottomMargin=12*mm
     )
