@@ -1,7 +1,10 @@
-// Shows success or error messages to the user
-// type = 'success' | 'error'
 export default function Alert({ message, type = 'success', onClose }) {
-  if (!message) return null  // render nothing if no message
+  if (!message) return null
+
+  // Safety: if message is somehow an object, stringify it
+  const displayMessage = typeof message === 'string'
+    ? message
+    : JSON.stringify(message)
 
   const styles = {
     success: 'bg-green-50 border-green-400 text-green-800',
@@ -9,10 +12,9 @@ export default function Alert({ message, type = 'success', onClose }) {
   }
 
   return (
-    <div className={`border rounded-md px-4 py-3 flex justify-between items-start ${styles[type]}`}>
-      <p className="text-sm">{message}</p>
-
-      {/* X button to dismiss the alert */}
+    <div className={`border rounded-md px-4 py-3 flex
+                     justify-between items-start ${styles[type]}`}>
+      <p className="text-sm">{displayMessage}</p>
       {onClose && (
         <button
           onClick={onClose}

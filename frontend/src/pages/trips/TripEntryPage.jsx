@@ -12,6 +12,7 @@ import SearchableSelect from '../../components/ui/SearchableSelect'
 import ChargeSummary from '../../components/ui/ChargeSummary'
 import Combobox from '../../components/ui/Combobox'
 import client from '../../api/client'
+import { useParams } from 'react-router-dom'
 
 // Today's date in YYYY-MM-DD format (required by HTML date input)
 const today = () => new Date().toISOString().split('T')[0]
@@ -46,6 +47,7 @@ const emptyForm = () => ({
   fiscal_year:          '',
 })
 
+
 export default function TripEntryPage() {
   const [form, setForm]           = useState(emptyForm())
   const [loading, setLoading]     = useState(false)
@@ -60,6 +62,8 @@ export default function TripEntryPage() {
   const [fixedRates, setFixedRates]       = useState([])
   const [purposes, setPurposes]           = useState([])
   const [institution, setInstitution]     = useState(null)
+  const [users, setUsers]                 = useState([])   // for passenger combobox
+
 
   // Load all master data and institution settings on mount
   useEffect(() => {
@@ -92,6 +96,33 @@ export default function TripEntryPage() {
       setAlert({ message: 'Failed to load form data. Check backend.', type: 'error' })
     })
   }, [])
+
+  const { id } = useParams()
+  const isEditing = Boolean(id)
+  useEffect(() => {
+  if (!isEditing) return
+  tripApi.get(id)
+    .then(r => {
+      const trip = r.data
+      // Convert HHMM integer back to HH:MM for time inputs
+      const toTimeStr = (t) => {
+        if (!t) return ''
+        const s = String(t).padStart(4, '0')
+        return `${s.slice(0, 2)}:${s.slice(2)}`
+      }
+      setForm({
+        ...trip,
+        departure_time: toTimeStr(trip.departure_time),
+        arrival_time:   toTimeStr(trip.arrival_time),
+        departure_date: trip.departure_date || today(),
+        arrival_date:   trip.arrival_date || today(),
+        override_amount: trip.override_amount || 0,
+      })
+    })
+    .catch(() => setAlert({ message: 'Failed to load trip.', type: 'error' }))
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [id])
+
   // Add this handler for saving new purposes
   const handleNewPurpose = async (text) => {
     try {
@@ -102,7 +133,7 @@ export default function TripEntryPage() {
     } catch (err) {
       console.error('Failed to save new purpose:', err)
     }
-}
+  }
   // When vehicle changes, auto-fill credit account from vehicle's default
   const handleVehicleChange = (code) => {
     const vehicle = vehicles.find(v => v.code === code)
@@ -270,8 +301,15 @@ export default function TripEntryPage() {
         if (payload[f]) payload[f] = parseInt(payload[f])
       })
 
-      await tripApi.create(payload)
-
+      if (isEditing) {
+        await tripApi.update(id, payload)
+        setAlert({ message: 'Trip updated successfully!', type: 'success' })
+      } else {
+        await tripApi.create(payload)
+        setAlert({ message: 'Trip saved successfully!', type: 'success' })
+        setForm({ ...emptyForm(), fiscal_year: form.fiscal_year })
+      }
+     
       setAlert({ message: 'Trip saved successfully!', type: 'success' })
       setCharge(null)
 
@@ -329,7 +367,7 @@ export default function TripEntryPage() {
       <div className="bg-white rounded-lg shadow-sm p-6">
 
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">New Trip Entry</h3>
+          <h3>{isEditing ? `Edit Trip #${id}` : 'New Trip Entry'}</h3>
           {/* Show fiscal year as a badge */}
           {form.fiscal_year && (
             <span className="bg-yellow-100 text-yellow-800 text-xs

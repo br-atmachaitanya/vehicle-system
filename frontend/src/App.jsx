@@ -8,80 +8,79 @@ import TripListPage from './pages/trips/TripListPage'
 import TripEntryPage from './pages/trips/TripEntryPage'
 import VehicleListPage from './pages/vehicles/VehicleListPage'
 import VehicleFormPage from './pages/vehicles/VehicleFormPage'
+import AccountsPage from './pages/accounts/AccountsPage'
+import UsersPage from './pages/users/UsersPage'
+import DriversPage from './pages/drivers/DriversPage'
+import ReportsPage from './pages/reports/ReportsPage'
 import SettingsPage from './pages/settings/SettingsPage'
-
-const Placeholder = ({ name }) => (
-  <div className="bg-white rounded-lg p-8 text-center text-gray-400">
-    <p className="text-lg">{name}</p>
-    <p className="text-sm mt-2">Coming soon</p>
-  </div>
-)
 
 const queryClient = new QueryClient()
 
-// ProtectedRoute — redirects to login if not authenticated
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-
-  // Still checking stored token — show nothing
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-gray-400">Loading...</p>
     </div>
   )
-
-  // Not logged in — redirect to login
   if (!user) return <Navigate to="/login" replace />
+  return children
+}
 
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.is_admin) return <Navigate to="/" replace />
   return children
 }
 
 function AppRoutes() {
   const { user } = useAuth()
-
   return (
     <Routes>
-      {/* Public route — no layout */}
       <Route path="/login" element={
         user ? <Navigate to="/" replace /> : <LoginPage />
       } />
 
-      {/* All other routes are protected */}
       <Route path="/*" element={
         <ProtectedRoute>
           <Layout>
             <Routes>
               <Route path="/"                    element={<DashboardPage />} />
+
+              {/* Trips */}
               <Route path="/trips"               element={<TripListPage />} />
-              <Route path="/trips/new"           element={<AdminRoute><TripEntryPage /></AdminRoute>} />
+              <Route path="/trips/new"           element={<TripEntryPage />} />
+              <Route path="/trips/:id/edit"      element={
+                <AdminRoute><TripEntryPage /></AdminRoute>
+              } />
+
+              {/* Vehicles */}
               <Route path="/vehicles"            element={<VehicleListPage />} />
-              <Route path="/vehicles/new"        element={<AdminRoute><VehicleFormPage /></AdminRoute>} />
-              <Route path="/vehicles/:code/edit" element={<AdminRoute><VehicleFormPage /></AdminRoute>} />
-              <Route path="/accounts"            element={<Placeholder name="Accounts" />} />
-              <Route path="/users"               element={<Placeholder name="Users" />} />
-              <Route path="/drivers"             element={<Placeholder name="Drivers" />} />
-              <Route path="/reports"             element={<Placeholder name="Reports" />} />
-              <Route path="/settings"            element={<AdminRoute><SettingsPage /></AdminRoute>} />
+              <Route path="/vehicles/new"        element={
+                <AdminRoute><VehicleFormPage /></AdminRoute>
+              } />
+              <Route path="/vehicles/:code/edit" element={
+                <AdminRoute><VehicleFormPage /></AdminRoute>
+              } />
+
+              {/* Masters */}
+              <Route path="/accounts"            element={<AccountsPage />} />
+              <Route path="/users"               element={<UsersPage />} />
+              <Route path="/drivers"             element={<DriversPage />} />
+
+              {/* Reports & Settings */}
+              <Route path="/reports"             element={<ReportsPage />} />
+              <Route path="/settings"            element={
+                <AdminRoute><SettingsPage /></AdminRoute>
+              } />
             </Routes>
           </Layout>
         </ProtectedRoute>
       } />
     </Routes>
   )
-}
-
-function AdminRoute({ children }) {
-  const { user, loading } = useAuth()
-
-  if (loading) return null
-
-  // Not logged in → login page
-  if (!user) return <Navigate to="/login" replace />
-
-  // Logged in but not admin → back to dashboard with a message
-  if (!user.is_admin) return <Navigate to="/" replace />
-
-  return children
 }
 
 export default function App() {

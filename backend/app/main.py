@@ -6,7 +6,7 @@ import app.models
 from app.routers import (
     institution, vehicles, accounts, credit_accounts,
     users, drivers, fixed_rates, purposes, trips,
-    vehicle_expenses, auth, setup                    # added auth, setup
+    vehicle_expenses, auth, setup , reports                  # added auth, setup
 )
 
 app = FastAPI(title="Vehicle Management System", version="1.0.0")
@@ -33,6 +33,7 @@ app.include_router(fixed_rates.router)
 app.include_router(purposes.router)
 app.include_router(trips.router)
 app.include_router(vehicle_expenses.router)
+app.include_router(reports.router)    # new
 
 @app.get("/api/health")
 def health_check():
