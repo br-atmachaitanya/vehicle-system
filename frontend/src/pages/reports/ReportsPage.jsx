@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { vehicleApi, driverApi, creditAccountApi, accountApi } from '../../api'
 import { reportsApi } from '../../api/reports'
 import FormField from '../../components/ui/FormField'
@@ -81,7 +81,8 @@ export default function ReportsPage() {
   const [loading, setLoading]     = useState(false)
   const [reportData, setReportData] = useState(null)
   const [alert, setAlert]         = useState(null)
-
+  
+  const printFnRef = useRef(null)
   // Master data for dropdowns
   const [vehicles, setVehicles]             = useState([])
   const [drivers, setDrivers]               = useState([])
@@ -167,7 +168,11 @@ export default function ReportsPage() {
       setLoading(false)
     }
   }
-
+  const handlePrint = () => {
+    if (printFnRef.current) {
+      printFnRef.current()   // calls the function ReportViewer attached
+    }
+  }
   const handleDownloadPdf = async () => {
     setLoading(true)
     try {
@@ -308,13 +313,15 @@ export default function ReportsPage() {
               )}
 
             </div>
+          </div>
 
-            {/* Action buttons */}
-            <div className="flex gap-3 mt-4">
-              <Button onClick={handleGenerate} disabled={loading}>
-                {loading ? 'Generating...' : 'Preview Report'}
-              </Button>
-              {reportData && (
+          {/* Action buttons */}
+          <div className="flex gap-3 mt-4">
+            <Button onClick={handleGenerate} disabled={loading}>
+              {loading ? 'Generating...' : 'Preview Report'}
+            </Button>
+            {reportData && (
+              <>
                 <Button
                   variant="secondary"
                   onClick={handleDownloadPdf}
@@ -322,23 +329,23 @@ export default function ReportsPage() {
                 >
                   ⬇ Download PDF
                 </Button>
-              )}
-              {reportData && (
                 <Button
                   variant="secondary"
-                  onClick={() => window.print()}
+                  onClick={handlePrint}
                 >
                   🖨 Print
                 </Button>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {/* Report preview */}
           {reportData && (
-            <ReportViewer data={reportData} />
+            <ReportViewer
+              data={reportData}
+              onPrint={printFnRef}
+            />
           )}
-
         </div>
       )}
     </div>

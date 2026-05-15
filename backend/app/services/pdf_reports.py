@@ -13,7 +13,7 @@ from reportlab.platypus import (
     Spacer, HRFlowable
 )
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-
+from reportlab.platypus import Paragraph as P
 
 # ── Shared styles & helpers ───────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ def base_table_style():
 
 def fmt_inr(amount) -> str:
     """Format number as Indian currency string."""
-    return f"\u20b9{float(amount):,.2f}"   # ₹ symbol
+    return f"Rs. {float(amount):,.2f}"   # Rs.  symbol
 
 
 def build_pdf_header(story, data: dict, styles: dict):
@@ -110,125 +110,78 @@ def build_pdf_header(story, data: dict, styles: dict):
                              color=colors.HexColor("#cccccc")))
     story.append(Spacer(1, 3*mm))
 
+def text(content, style_name='normal', styles=None):
+    """
+    Wrap a string in a Paragraph for auto word-wrapping in table cells.
+    Falls back to plain string if content is empty.
+    """
+    if not content:
+        return '—'
+    if styles is None:
+        styles = get_styles()
+    return P(str(content), styles[style_name])
 
 # ── Report-specific PDF builders ─────────────────────────────────────────────
 
+from reportlab.platypus import Paragraph as P
+
+def text(content, style_name='normal', styles=None):
+    """
+    Wrap a string in a Paragraph for auto word-wrapping in table cells.
+    Falls back to plain string if content is empty.
+    """
+    if not content:
+        return '—'
+    if styles is None:
+        styles = get_styles()
+    return P(str(content), styles[style_name])
+
+
 def pdf_account_bill(data: dict) -> bytes:
-    """Generate Account Bill PDF."""
     buffer = BytesIO()
-    doc    = SimpleDocTemplate(
+    doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=12*mm, bottomMargin=12*mm
     )
     styles = get_styles()
     story  = []
-
     build_pdf_header(story, data, styles)
 
     for group in data["groups"]:
-        # Account name as section header
         story.append(Paragraph(
             f"{group['account_code']} — {group['account_name']}",
             styles["section_header"]
         ))
 
-        # Table for this account's trips
         table_data = [[
-            "Date", "Vehicle", "Passenger", "Purpose", "KM", "Amount (₹)"
+            "Date", "Vehicle", "Passenger", "Purpose", "KM", "Amount (Rs. )"
         ]]
+
         for trip in group["trips"]:
             table_data.append([
                 trip["date"],
-                trip["vehicle"],
-                trip["passenger"][:20],    # truncate long names
-                trip["purpose"][:25],
+                # Paragraph wraps long text automatically
+                P(trip["vehicle"],   styles["normal"]),
+                P(trip["passenger"], styles["normal"]),
+                P(trip["purpose"],   styles["normal"]),
                 str(trip["km_run"]),
                 fmt_inr(trip["amount"]),
             ])
 
-        # Subtotal row
         table_data.append([
-            "", "", "", "",
-            "Subtotal:",
+            "", "", "", "Subtotal:", "",
             fmt_inr(group["subtotal"])
         ])
 
-        col_widths = [20*mm, 40*mm, 35*mm, 45*mm, 15*mm, 25*mm]
-        table = Table(table_data, colWidths=col_widths)
+        # Column widths — must add up to page width minus margins
+        # A4 portrait usable width = 210 - 24 = 186mm
+        col_widths = [18*mm, 38*mm, 36*mm, 58*mm, 13*mm, 23*mm]
+        table = Table(table_data, colWidths=col_widths,
+                      repeatRows=1)  # repeat header on each page
 
         style = base_table_style()
-        # Style the subtotal row differently
-        subtotal_row = len(table_data) - 1
-        style.add("BACKGROUND",  (0, subtotal_row), (-1, subtotal_row),
-                  colors.HexColor("#e8f0fe"))
-        style.add("FONTNAME",    (0, subtotal_row), (-1, subtotal_row),
-                  "Helvetica-Bold")
-        style.add("ALIGN",       (-2, subtotal_row), (-1, subtotal_row), "RIGHT")
-
-        table.setStyle(style)
-        story.append(table)
-        story.append(Spacer(1, 4*mm))
-
-    # Grand total
-    story.append(HRFlowable(width="100%", thickness=1,
-                             color=colors.HexColor("#1e3a5f")))
-    story.append(Paragraph(
-        f"Grand Total: {fmt_inr(data['grand_total'])}",
-        styles["total"]
-    ))
-
-    doc.build(story)
-    return buffer.getvalue()
-
-
-def pdf_credit_bill(data: dict) -> bytes:
-    """Generate Credit Bill PDF."""
-    buffer = BytesIO()
-    doc    = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
-    )
-    styles = get_styles()
-    story  = []
-
-    # Custom header for credit bill
-    story.append(Paragraph(data["institution"], styles["title"]))
-    story.append(Paragraph(
-        f"Credit to: {data['credit_name']}",
-        styles["title"]
-    ))
-    story.append(Paragraph(
-        f"From {data['date_from']} to {data['date_to']}",
-        styles["subtitle"]
-    ))
-    story.append(HRFlowable(width="100%", thickness=0.5,
-                             color=colors.HexColor("#cccccc")))
-    story.append(Spacer(1, 3*mm))
-
-    for group in data["groups"]:
-        story.append(Paragraph(
-            f"Debit to: {group['account_code']} — {group['account_name']}",
-            styles["section_header"]
-        ))
-
-        table_data = [["Date", "Vehicle", "Passenger", "Purpose", "KM", "Amount (₹)"]]
-        for trip in group["trips"]:
-            table_data.append([
-                trip["date"],
-                trip["vehicle"],
-                trip["passenger"][:20],
-                trip["purpose"][:25],
-                str(trip["km_run"]),
-                fmt_inr(trip["amount"]),
-            ])
-        table_data.append(["", "", "", "", "Subtotal:", fmt_inr(group["subtotal"])])
-
-        col_widths = [20*mm, 40*mm, 35*mm, 45*mm, 15*mm, 25*mm]
-        table      = Table(table_data, colWidths=col_widths)
-        style      = base_table_style()
-        sub_row    = len(table_data) - 1
+        sub_row = len(table_data) - 1
         style.add("BACKGROUND", (0, sub_row), (-1, sub_row),
                   colors.HexColor("#e8f0fe"))
         style.add("FONTNAME",   (0, sub_row), (-1, sub_row), "Helvetica-Bold")
@@ -243,61 +196,118 @@ def pdf_credit_bill(data: dict) -> bytes:
         f"Grand Total: {fmt_inr(data['grand_total'])}",
         styles["total"]
     ))
-
     doc.build(story)
     return buffer.getvalue()
 
 
-def pdf_log_book(data: dict) -> bytes:
-    """Generate Vehicle Log Book PDF — landscape for wide table."""
+def pdf_credit_bill(data: dict) -> bytes:
     buffer = BytesIO()
-    doc    = SimpleDocTemplate(
-        buffer, pagesize=landscape(A4),
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=12*mm, bottomMargin=12*mm
     )
     styles = get_styles()
     story  = []
 
     story.append(Paragraph(data["institution"], styles["title"]))
     story.append(Paragraph(
-        f"Vehicle Log Book — {data['vehicle_name']}",
-        styles["title"]
+        f"Credit to: {data['credit_name']}", styles["title"]
     ))
     story.append(Paragraph(
         f"From {data['date_from']} to {data['date_to']}",
         styles["subtitle"]
+    ))
+    story.append(HRFlowable(width="100%", thickness=0.5,
+                             color=colors.HexColor("#cccccc")))
+    story.append(Spacer(1, 3*mm))
+
+    for group in data["groups"]:
+        story.append(Paragraph(
+            f"Debit: {group['account_code']} — {group['account_name']}",
+            styles["section_header"]
+        ))
+        table_data = [["Date","Vehicle","Passenger","Purpose","KM","Amount (Rs. )"]]
+        for trip in group["trips"]:
+            table_data.append([
+                trip["date"],
+                P(trip["vehicle"],   styles["normal"]),
+                P(trip["passenger"], styles["normal"]),
+                P(trip["purpose"],   styles["normal"]),
+                str(trip["km_run"]),
+                fmt_inr(trip["amount"]),
+            ])
+        table_data.append(["","","","Subtotal:","", fmt_inr(group["subtotal"])])
+
+        col_widths = [18*mm, 38*mm, 36*mm, 58*mm, 13*mm, 23*mm]
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        style = base_table_style()
+        sub_row = len(table_data) - 1
+        style.add("BACKGROUND", (0, sub_row), (-1, sub_row),
+                  colors.HexColor("#e8f0fe"))
+        style.add("FONTNAME",   (0, sub_row), (-1, sub_row), "Helvetica-Bold")
+        table.setStyle(style)
+        story.append(table)
+        story.append(Spacer(1, 4*mm))
+
+    story.append(HRFlowable(width="100%", thickness=1,
+                             color=colors.HexColor("#1e3a5f")))
+    story.append(Paragraph(
+        f"Grand Total: {fmt_inr(data['grand_total'])}",
+        styles["total"]
+    ))
+    doc.build(story)
+    return buffer.getvalue()
+
+
+def pdf_log_book(data: dict) -> bytes:
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=12*mm, bottomMargin=12*mm
+    )
+    styles = get_styles()
+    story  = []
+
+    story.append(Paragraph(data["institution"], styles["title"]))
+    story.append(Paragraph(
+        f"Vehicle Log Book — {data['vehicle_name']}", styles["title"]
+    ))
+    story.append(Paragraph(
+        f"From {data['date_from']} to {data['date_to']}", styles["subtitle"]
     ))
     story.append(Spacer(1, 3*mm))
 
     table_data = [[
         "Date", "Passenger", "Purpose",
         "KM Out", "KM In", "KM Run",
-        "Dep.", "Arr.", "Account", "Driver"
+        "Dep", "Arr", "Account", "Driver"
     ]]
     for row in data["rows"]:
         table_data.append([
             row["date"],
-            row["passenger"][:18],
-            row["purpose"][:22],
+            P(row["passenger"], styles["normal"]),
+            P(row["purpose"],   styles["normal"]),
             str(row["km_out"]),
             str(row["km_in"]),
             str(row["km_run"]),
             row["dep_time"],
             row["arr_time"],
-            row["account"][:18],
-            row["driver"][:12],
+            P(row["account"],   styles["normal"]),
+            P(row["driver"],    styles["normal"]),
         ])
 
-    # Total row
     table_data.append([
-        "", "", "", "", "Total KM:", str(data["total_km"]),
-        "", "", "", ""
+        "","","","","Total KM:",
+        str(data["total_km"]),
+        "","","",""
     ])
 
-    col_widths = [20*mm, 35*mm, 42*mm, 18*mm, 18*mm,
-                  18*mm, 16*mm, 16*mm, 38*mm, 28*mm]
-    table = Table(table_data, colWidths=col_widths)
+    # A4 landscape usable width = 297 - 24 = 273mm
+    col_widths = [18*mm, 35*mm, 60*mm, 18*mm, 18*mm,
+                  18*mm, 14*mm, 14*mm, 50*mm, 28*mm]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
     style = base_table_style()
     total_row = len(table_data) - 1
     style.add("BACKGROUND", (0, total_row), (-1, total_row),
@@ -305,61 +315,58 @@ def pdf_log_book(data: dict) -> bytes:
     style.add("FONTNAME",   (0, total_row), (-1, total_row), "Helvetica-Bold")
     table.setStyle(style)
     story.append(table)
-
     doc.build(story)
     return buffer.getvalue()
 
 
 def pdf_driver_log_book(data: dict) -> bytes:
-    """Generate Driver Log Book PDF."""
     buffer = BytesIO()
-    doc    = SimpleDocTemplate(
+    doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=12*mm, bottomMargin=12*mm
     )
     styles = get_styles()
     story  = []
 
     story.append(Paragraph(data["institution"], styles["title"]))
     story.append(Paragraph(
-        f"Driver Log Book — {data['driver_name']}",
-        styles["title"]
+        f"Driver Log Book — {data['driver_name']}", styles["title"]
     ))
     story.append(Paragraph(
-        f"From {data['date_from']} to {data['date_to']}",
-        styles["subtitle"]
+        f"From {data['date_from']} to {data['date_to']}", styles["subtitle"]
     ))
     story.append(Spacer(1, 3*mm))
 
     table_data = [[
         "Date", "Passenger", "Purpose",
         "KM Out", "KM In", "KM Run",
-        "Dep.", "Arr.", "Duration (min)", "Vehicle"
+        "Dep", "Arr", "Dur(min)", "Vehicle"
     ]]
     for row in data["rows"]:
         table_data.append([
             row["date"],
-            row["passenger"][:18],
-            row["purpose"][:22],
+            P(row["passenger"], styles["normal"]),
+            P(row["purpose"],   styles["normal"]),
             str(row["km_out"]),
             str(row["km_in"]),
             str(row["km_run"]),
             row["dep_time"],
             row["arr_time"],
             str(row["duration"]),
-            row["vehicle"][:20],
+            P(row["vehicle"],   styles["normal"]),
         ])
 
     table_data.append([
-        "", "", "", "", "Total:",
-        str(data["total_km"]), "", "",
-        str(data["total_duration"]), ""
+        "","","","","Total:",
+        str(data["total_km"]),
+        "","",str(data["total_duration"]),""
     ])
 
-    col_widths = [20*mm, 35*mm, 40*mm, 18*mm, 18*mm,
-                  18*mm, 16*mm, 16*mm, 25*mm, 43*mm]
-    table = Table(table_data, colWidths=col_widths)
+    # A4 landscape = 273mm usable
+    col_widths = [18*mm, 35*mm, 60*mm, 18*mm, 18*mm,
+                  18*mm, 14*mm, 14*mm, 20*mm, 58*mm]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
     style = base_table_style()
     total_row = len(table_data) - 1
     style.add("BACKGROUND", (0, total_row), (-1, total_row),
@@ -367,18 +374,16 @@ def pdf_driver_log_book(data: dict) -> bytes:
     style.add("FONTNAME",   (0, total_row), (-1, total_row), "Helvetica-Bold")
     table.setStyle(style)
     story.append(table)
-
     doc.build(story)
     return buffer.getvalue()
 
 
 def pdf_income_expenditure(data: dict) -> bytes:
-    """Generate Income vs Expenditure PDF — landscape."""
     buffer = BytesIO()
-    doc    = SimpleDocTemplate(
+    doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=12*mm, bottomMargin=12*mm
     )
     styles = get_styles()
     story  = []
@@ -386,19 +391,18 @@ def pdf_income_expenditure(data: dict) -> bytes:
     story.append(Paragraph(data["institution"], styles["title"]))
     story.append(Paragraph(data["title"], styles["title"]))
     story.append(Paragraph(
-        f"From {data['date_from']} to {data['date_to']}",
-        styles["subtitle"]
+        f"From {data['date_from']} to {data['date_to']}", styles["subtitle"]
     ))
     story.append(Spacer(1, 3*mm))
 
     table_data = [[
-        "Vehicle", "KM Run", "Income (₹)",
-        "Fuel (L)", "Fuel (₹)", "Repair (₹)",
-        "Misc (₹)", "Exp. (₹)", "Net (₹)", "KM/L"
+        "Vehicle", "KM", "Income\n(Rs. )",
+        "Fuel\n(L)", "Fuel\n(Rs. )", "Repair\n(Rs. )",
+        "Misc\n(Rs. )", "Total Exp\n(Rs. )", "Net\n(Rs. )", "KM/L"
     ]]
     for row in data["rows"]:
         table_data.append([
-            row["vehicle_name"][:28],
+            P(row["vehicle_name"], styles["normal"]),
             str(row["total_km"]),
             fmt_inr(row["total_income"]),
             str(row["fuel_qty"]),
@@ -410,11 +414,9 @@ def pdf_income_expenditure(data: dict) -> bytes:
             str(row["km_per_litre"]),
         ])
 
-    # Totals row
     t = data["totals"]
     table_data.append([
-        "TOTAL",
-        str(t["total_km"]),
+        "TOTAL", str(t["total_km"]),
         fmt_inr(t["total_income"]),
         str(t["fuel_qty"]),
         fmt_inr(t["fuel_cost"]),
@@ -425,9 +427,10 @@ def pdf_income_expenditure(data: dict) -> bytes:
         "—",
     ])
 
-    col_widths = [55*mm, 18*mm, 25*mm, 18*mm, 25*mm,
-                  25*mm, 22*mm, 25*mm, 25*mm, 15*mm]
-    table = Table(table_data, colWidths=col_widths)
+    # A4 landscape = 273mm usable
+    col_widths = [58*mm, 16*mm, 24*mm, 16*mm, 24*mm,
+                  24*mm, 22*mm, 26*mm, 26*mm, 15*mm]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
     style = base_table_style()
     total_row = len(table_data) - 1
     style.add("BACKGROUND", (0, total_row), (-1, total_row),
@@ -436,18 +439,16 @@ def pdf_income_expenditure(data: dict) -> bytes:
     style.add("FONTNAME",   (0, total_row), (-1, total_row), "Helvetica-Bold")
     table.setStyle(style)
     story.append(table)
-
     doc.build(story)
     return buffer.getvalue()
 
 
 def pdf_certificate_register(data: dict) -> bytes:
-    """Generate Certificate Register PDF — landscape."""
     buffer = BytesIO()
-    doc    = SimpleDocTemplate(
+    doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm
+        leftMargin=10*mm, rightMargin=10*mm,
+        topMargin=12*mm, bottomMargin=12*mm
     )
     styles = get_styles()
     story  = []
@@ -455,65 +456,80 @@ def pdf_certificate_register(data: dict) -> bytes:
     story.append(Paragraph(data["institution"], styles["title"]))
     story.append(Paragraph(data["title"], styles["title"]))
     story.append(Paragraph(
-        f"As of {data['as_of_date']}",
-        styles["subtitle"]
+        f"As of {data['as_of_date']}", styles["subtitle"]
     ))
     story.append(Spacer(1, 3*mm))
 
     table_data = [[
-        "Vehicle", "Reg. No.",
-        "Road Tax", "Insurance", "Fitness",
+        "Vehicle", "Reg No",
+        "Road\nTax", "Insurance", "Fitness",
         "Permit", "PUC", "VS Toll",
-        "Howrah Stn", "Sealdah Stn"
+        "Howrah\nStn", "Sealdah\nStn"
     ]]
 
+    # Status colors for PDF
+    status_colors = {
+        'expired': colors.HexColor("#dc2626"),
+        'soon':    colors.HexColor("#ea580c"),
+        'ok':      colors.black,
+        'missing': colors.HexColor("#9ca3af"),
+    }
+
     for row in data["rows"]:
-        def cell(field):
-            """Color-code expired/soon cells."""
+        cert_cells = []
+        for field in ["road_tax","insurance","fitness","permit",
+                      "puc","vs_toll","howrah_stn","sealdah_stn"]:
             d = row[field]["date"]
             s = row[field]["status"]
-            if s == "expired":
-                return Paragraph(
-                    f'<font color="red"><b>{d}</b></font>',
-                    styles["normal"]
-                )
-            if s == "soon":
-                return Paragraph(
-                    f'<font color="orange"><b>{d}</b></font>',
-                    styles["normal"]
-                )
-            return d
+            color = status_colors.get(s, colors.black)
+            # Use colored Paragraph for status
+            cert_cells.append(
+                P(f'<font color="{color.hexval() if hasattr(color, "hexval") else "#000"}">'
+                  f'{d}</font>',
+                  styles["normal"])
+                if s in ('expired', 'soon')
+                else d
+            )
 
         table_data.append([
-            row["description"][:25],
+            P(row["description"], styles["normal"]),
             row["reg_number"],
-            cell("road_tax"),
-            cell("insurance"),
-            cell("fitness"),
-            cell("permit"),
-            cell("puc"),
-            cell("vs_toll"),
-            cell("howrah_stn"),
-            cell("sealdah_stn"),
+            *cert_cells
         ])
 
-    col_widths = [50*mm, 25*mm, 22*mm, 22*mm, 22*mm,
-                  22*mm, 22*mm, 22*mm, 25*mm, 25*mm]
-    table = Table(table_data, colWidths=col_widths)
-    table.setStyle(base_table_style())
+    # A4 landscape = 277mm usable (tighter margins)
+    col_widths = [52*mm, 24*mm, 20*mm, 22*mm, 20*mm,
+                  20*mm, 20*mm, 20*mm, 22*mm, 22*mm]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    style = base_table_style()
+    # Make expired cells red background
+    for ri, row in enumerate(data["rows"], start=1):
+        for ci, field in enumerate(
+            ["road_tax","insurance","fitness","permit",
+             "puc","vs_toll","howrah_stn","sealdah_stn"],
+            start=2
+        ):
+            s = row[field]["status"]
+            if s == 'expired':
+                style.add("BACKGROUND", (ci, ri), (ci, ri),
+                          colors.HexColor("#fee2e2"))
+            elif s == 'soon':
+                style.add("BACKGROUND", (ci, ri), (ci, ri),
+                          colors.HexColor("#fff7ed"))
+
+    table.setStyle(style)
     story.append(table)
 
     # Legend
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(
-        '<font color="red">Red</font> = Expired  &nbsp;&nbsp;'
-        '<font color="orange">Orange</font> = Expiring within 30 days',
+        'Red background = Expired  |  Orange background = Expiring within 30 days',
         styles["footer"]
     ))
 
     doc.build(story)
     return buffer.getvalue()
-
 
 # ── Dispatch table — maps report_type to PDF builder ────────────────────────
 
